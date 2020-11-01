@@ -24,16 +24,6 @@ func (this *MessageBuilder) Text(format string, args ...interface{}) *message.Te
 	}
 }
 
-//at消息
-func (this *MessageBuilder) At(qq int64) *message.AtElement {
-	return message.NewAt(qq)
-}
-
-//at全体
-func (this *MessageBuilder) AtAll() *message.AtElement {
-	return this.At(0)
-}
-
 //通过图片ID进行发送
 func (this *MessageBuilder) ImageId(imgId string) *message.ImageElement {
 	return &message.ImageElement{
@@ -44,6 +34,38 @@ func (this *MessageBuilder) ImageId(imgId string) *message.ImageElement {
 //群组消息
 type GroupMessageBuilder struct {
 	MessageBuilder
+}
+
+//at消息,群里才有at功能
+func (this *GroupMessageBuilder) At(qq int64) *message.AtElement {
+	//这里如果不给用户名称的话,手机端会显示为空,不会自动匹配昵称
+	key := fmt.Sprintf("cache:group:qq:%d", this.Event.GroupCode)
+	field := fmt.Sprintf("%d", qq)
+
+	nickName := ""
+	res, err := this.Cache.GetMap(key, field)
+	if err == nil {
+		sender := new(message.Sender)
+		err := util.JsonDecode(res, sender)
+		if err == nil {
+			nickName = fmt.Sprintf("@%s", sender.Nickname)
+		}
+	}
+	if len(nickName) == 0 {
+		//如果没有咋办呢?
+		nickName = fmt.Sprintf("@%d", qq)
+		// todo 可以使用api远程获取qq昵称
+	}
+
+	return &message.AtElement{
+		Target:  qq,
+		Display: nickName,
+	}
+}
+
+//at全体
+func (this *GroupMessageBuilder) AtAll() *message.AtElement {
+	return this.At(0)
 }
 
 //上传&发送本地资源图片

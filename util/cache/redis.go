@@ -44,3 +44,16 @@ func (this *RedisCache) Exists(name string) bool {
 	}
 	return true
 }
+func (this *RedisCache) GetMap(key, name string) (string, error) {
+	return this.handle.Rdb.HGet(this.ctx, key, name).Result()
+}
+func (this *RedisCache) SetMap(key, name string, val interface{}) error {
+	return this.handle.Rdb.HSet(this.ctx, key, name, val).Err()
+}
+func (this *RedisCache) ExistsMap(key, name string) bool {
+	flag, err := this.handle.Rdb.HExists(this.ctx, key, name).Result()
+	if err != nil {
+		return false
+	}
+	return flag
+}

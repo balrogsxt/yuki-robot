@@ -3,10 +3,7 @@
 > 项目将核心协议库合并整合了一下方便开发
 
 ## 安装
-> 克隆本项目到本地,然后使用go get安装Miraigo核心协议库
-```
-go get github.com/Mrs4s/MiraiGo
-```
+克隆项目到本地
 
 ## 配置
 > 创建config.json文件放置到根目录,配置如下(不含注释)

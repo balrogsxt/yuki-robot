@@ -99,23 +99,30 @@ func (this *QQBot) registerCache() {
 func (this *QQBot) registerEvent() {
 	//注册群聊消息事件
 	this.Handle.OnGroupMessage(func(qqClient *client.QQClient, ev *message.GroupMessage) {
+		isAllow := false
 		for _, item := range this.config.AllowGroup {
 			if item == ev.GroupCode {
-				logger.Info("[群聊消息-> %d -> %s] %s", ev.GroupCode, ev.GroupName, ev.ToString())
-				handle := &msg.GroupHandle{
-					Handle: qqClient,
-					MsgBuild: &msg.GroupMessageBuilder{
-						MessageBuilder: msg.MessageBuilder{
-							Handle: qqClient,
-							Event:  ev,
-							Cache:  this.Cache,
-						},
-					},
-				}
-				event.OnGroupMessageEvent(handle, ev)
+				isAllow = true
 				break
 			}
 		}
+		if !isAllow {
+			return
+		}
+		this.saveGroupQQ(ev.GroupCode, ev.Sender)
+		logger.Info("[群聊消息-> %d -> %s] %s", ev.GroupCode, ev.GroupName, ev.ToString())
+		handle := &msg.GroupHandle{
+			Handle: qqClient,
+			Event:  ev,
+			MsgBuild: &msg.GroupMessageBuilder{
+				MessageBuilder: msg.MessageBuilder{
+					Handle: qqClient,
+					Event:  ev,
+					Cache:  this.Cache,
+				},
+			},
+		}
+		event.OnGroupMessageEvent(handle)
 	})
 	//注册群聊消息撤回事件
 	this.Handle.OnGroupMessageRecalled(func(qqClient *client.QQClient, msg *client.GroupMessageRecalledEvent) {
@@ -132,4 +139,18 @@ func (this *QQBot) registerEvent() {
 		logger.Info("[断开连接] %s", disconnectedEvent.Message)
 	})
 	//更多事件,按需求写...
+}
+
+//缓存群内成员数据
+func (this *QQBot) saveGroupQQ(groupId int64, sender *message.Sender) {
+	// todo 暂时收到群成员信息就写入缓存吧...
+	key := fmt.Sprintf("cache:group:qq:%d", groupId)
+	field := fmt.Sprintf("%d", sender.Uin)
+	//if flag := this.Cache.ExistsMap(key,field); !flag{
+	//写入缓存
+	this.Cache.SetMap(key, field, util.JsonEncode(&sender))
+	//}else{
+	//存在缓存,这个需要永久缓存,但是需要定期更新数据
+
+	//}
 }
