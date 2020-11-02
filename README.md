@@ -20,13 +20,15 @@
     }
 }
 ```
-## 调试&编译
+## 启动
 ```
 //运行
 go run main.go 
 //编译
 go build main.go
 ```
+## 增加群组命令模块
+在modules目录下创建结构体并继承`event.GroupModuleHandle`然后实现`GetCommand` `GetName` `Handle` 方法
 
 ## 机器人功能
 > 以下功能均为本地未开放API接口
