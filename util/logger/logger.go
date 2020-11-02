@@ -2,9 +2,9 @@ package logger
 
 import (
 	"fmt"
+	"github.com/balrogsxt/xtbot-go/util"
 	log "github.com/sirupsen/logrus"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -13,9 +13,32 @@ type LoggerFormat struct {
 
 func (s *LoggerFormat) Format(entry *log.Entry) ([]byte, error) {
 	date := time.Now().Local().Format("2006-01-02 15:04:05")
-	level := strings.ToUpper(entry.Level.String())
+	level := "NULL"
+	color := "f"
+	switch entry.Level {
+	case log.InfoLevel:
+		color = "a"
+		level = "INFO "
+		break
+	case log.WarnLevel:
+		color = "e"
+		level = "WARN "
+		break
+	case log.ErrorLevel:
+		color = "c"
+		level = "ERROR"
+		break
+	case log.FatalLevel:
+		color = "c"
+		level = "FATAL"
+		break
+	case log.DebugLevel:
+		color = "7"
+		level = "DEBUG"
+		break
+	}
 	text := entry.Message
-	msg := fmt.Sprintf("[%s] [%s]: %s\n", date, level, text)
+	msg := util.PrintlnColor("§%s[%s] [%s]:§f %s\n", color, date, level, text)
 	return []byte(msg), nil
 }
 func init() {

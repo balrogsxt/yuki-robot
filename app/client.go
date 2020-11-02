@@ -17,19 +17,20 @@ import (
 
 //机器人结构
 type QQBot struct {
-	Handle *client.QQClient  //核心QQ客户端协议模块
-	config entity.UserConfig //登录的用户数据
-	Cache  cache.XtCache     //缓存模块
+	Handle      *client.QQClient    //核心QQ客户端协议模块
+	config      entity.UserConfig   //登录的用户数据
+	Cache       cache.XtCache       //缓存模块
+	GroupModule []event.GroupModule //注册的群组模块
 }
 
 //启动
-func AppLinkStart() {
+func AppLinkStart(callback func(bot *QQBot)) {
 	config, err := ParseUserConfig()
 	if err != nil {
 		ThrowException("登录配置文件处理失败:%s", err.Error())
 	}
 	bot := new(QQBot)
-	bot.Login(config)
+	bot.Login(config, callback)
 }
 
 //解析需要登录的机器人账户
@@ -48,7 +49,7 @@ func ParseUserConfig() (entity.UserConfig, error) {
 	}
 	return la, nil
 }
-func (this *QQBot) Login(config entity.UserConfig) {
+func (this *QQBot) Login(config entity.UserConfig, callback func(bot *QQBot)) {
 	logger.Info("正在准备尝试登录QQ:[%d]...", config.QQ)
 	//创建一个新的QQ客户端
 	this.Handle = client.NewClient(config.QQ, config.Password)
@@ -80,6 +81,7 @@ func (this *QQBot) Login(config entity.UserConfig) {
 	this.registerCache()
 	//开始监听各项数据
 	this.registerEvent() //调用注册事件
+	callback(this)       //回调
 	//开启命令行输入进程顺便阻止退出
 	StartCommand()
 }
@@ -111,7 +113,7 @@ func (this *QQBot) registerEvent() {
 		}
 		this.saveGroupQQ(ev.GroupCode, ev.Sender)
 		logger.Info("[群聊消息-> %d -> %s] %s", ev.GroupCode, ev.GroupName, ev.ToString())
-		handle := &msg.GroupHandle{
+		handle := &event.GroupMessageEvent{
 			Handle: qqClient,
 			Event:  ev,
 			MsgBuild: &msg.GroupMessageBuilder{
@@ -122,7 +124,7 @@ func (this *QQBot) registerEvent() {
 				},
 			},
 		}
-		event.OnGroupMessageEvent(handle)
+		event.OnGroupMessageEvent(this.GroupModule, handle)
 	})
 	//注册群聊消息撤回事件
 	this.Handle.OnGroupMessageRecalled(func(qqClient *client.QQClient, msg *client.GroupMessageRecalledEvent) {
@@ -153,4 +155,10 @@ func (this *QQBot) saveGroupQQ(groupId int64, sender *message.Sender) {
 	//存在缓存,这个需要永久缓存,但是需要定期更新数据
 
 	//}
+}
+
+//注册群了模块
+func (this *QQBot) RegisterGroupModule(m event.GroupModule) {
+	this.GroupModule = append(this.GroupModule, m)
+	logger.Info("[注册群聊模块] -> [%s] 成功", m.GetName())
 }

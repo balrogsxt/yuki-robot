@@ -119,3 +119,19 @@ func (this *GroupMessageBuilder) LocalImage(fileName string) *message.GroupImage
 //	this.Cache.Set(cacheField,util.JsonEncode(&img)) //永久缓存
 //	return img
 //}
+
+//文字版快捷消息
+//at用户
+func At(qq interface{}) string {
+	return fmt.Sprintf("[type=at,value=%d]", qq)
+}
+
+//at全体
+func AtAll() string {
+	return "[type=at,value=0]"
+}
+
+//图片消息
+func Image(idOrPath string) string {
+	return fmt.Sprintf("[type=image,value=%s]", idOrPath)
+}

@@ -1,5 +1,5 @@
 # 简介
-基于 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 实现的协议开发的QQ机器人
+基于 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 实现的协议开发的QQ机器人(可能不适用于所有人)
 > 项目将核心协议库合并整合了一下方便开发
 
 ## 安装
@@ -27,3 +27,13 @@ go run main.go
 //编译
 go build main.go
 ```
+
+## 机器人功能
+> 以下功能均为本地未开放API接口
+- [x] 查询IP归属地
+- [ ] 查询手机号归属地
+- [ ] 端口检测是否开启
+- [ ] SSl证书信息查询
+- [ ] 网站Favicon图片获取
+- [ ] 二维码生成
+- [ ] 更多功能想法....
