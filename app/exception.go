@@ -7,3 +7,5 @@ func ThrowException(format string, v ...interface{}) {
 	// todo 先抛出简单异常把
 	panic(fmt.Sprintf(format, v...))
 }
+
+

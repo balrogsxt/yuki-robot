@@ -48,12 +48,12 @@ func init() {
 
 //普通信息
 func Info(format string, args ...interface{}) {
-	log.Infof(fmt.Sprintf(format, args...))
+	log.Infof(format, args...)
 }
 
 //调试日志
 func Debug(format string, args ...interface{}) {
-	log.Debug(fmt.Sprintf(format, args...))
+	log.Debugf(format, args...)
 }
 
 //错误日志

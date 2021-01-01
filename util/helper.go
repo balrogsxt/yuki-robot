@@ -3,6 +3,7 @@ package util
 import (
 	"bufio"
 	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"github.com/gookit/color"
 	jsoniter "github.com/json-iterator/go"
@@ -25,6 +26,12 @@ func JsonEncode(v interface{}) string {
 		return ""
 	}
 	return string(b)
+}
+
+func Md5String(str string) string  {
+	m := md5.New()
+	m.Write([]byte(str))
+	return hex.EncodeToString(m.Sum(nil))
 }
 
 func Md5File(file string) string {
@@ -113,4 +120,30 @@ func PrintlnColor(format string, args ...interface{}) string {
 		}
 	}
 	return result
+}
+func IsFile(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if s.IsDir() {
+		return false
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+func IsDir(path string) bool {
+	s,err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if s.IsDir() {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
