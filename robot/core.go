@@ -12,7 +12,6 @@ import (
 	"os"
 )
 
-
 type Robot struct {
 	Config *app.RobotConfig
 	Handle *client.QQClient
@@ -23,25 +22,24 @@ type Robot struct {
 
 }
 
-
 //创建新的机器人
-func NewRobot() (*Robot,error) {
+func NewRobot() (*Robot, error) {
 	robot := new(Robot)
-	conf,err := app.LoadRobotConfig()
+	conf, err := app.LoadRobotConfig()
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	robot.Config = conf
 
-	return robot,nil
+	return robot, nil
 }
 
 //登录机器人账户
 func (this *Robot) Login() error {
 	config := this.Config
 	pwd := config.User.Password
-	_client := client.NewClient(config.User.QQ,pwd)
-	res,err := _client.Login()
+	_client := client.NewClient(config.User.QQ, pwd)
+	res, err := _client.Login()
 	if err != nil {
 		return errors.New(fmt.Sprintf("初始化登录客户端失败:%s", err.Error()))
 	}
@@ -60,16 +58,16 @@ func (this *Robot) Login() error {
 
 	api.SetLoginQQClient(_client)
 
-	logger.Info("%s(%d) 已登录成功!",_client.Nickname,_client.Uin)
+	logger.Info("%s(%d) 已登录成功!", _client.Nickname, _client.Uin)
 
 	//加载群组
-	groupList,err := _client.GetGroupList()
+	groupList, err := _client.GetGroupList()
 	if err == nil {
-		for _,group := range groupList {
-			logger.Info("[群组加载] %s(%d)",group.Name,group.Uin)
+		for _, group := range groupList {
+			logger.Info("[群组加载] %s(%d)", group.Name, group.Uin)
 		}
-	}else{
-		logger.Warning("[群组加载失败] %s",err.Error())
+	} else {
+		logger.Warning("[群组加载失败] %s", err.Error())
 	}
 
 	this.registerEvent()
@@ -79,20 +77,19 @@ func (this *Robot) Login() error {
 }
 
 //注册消息事件
-func (this *Robot) registerEvent()  {
+func (this *Robot) registerEvent() {
 	h := this.Handle
 
 	h.OnDisconnected(func(qqClient *client.QQClient, event *client.ClientDisconnectedEvent) {
 		api.SetLoginQQClient(nil) //设定登录失效
-		this.cronTask.Stop() //停止任务计划
-		logger.Fatal("[账户离线] %s",event.Message)
+		this.cronTask.Stop()      //停止任务计划
+		logger.Fatal("[账户离线] %s", event.Message)
 	})
 	//注册群组相关事件
-	h.OnGroupMessage(OnGroupMessageEvent) //群消息接收事件
+	h.OnGroupMessage(OnGroupMessageEvent)               //群消息接收事件
 	h.OnGroupMessageRecalled(OnGroupMessageRecallEvent) //群消息撤回事件
 	h.OnGroupMemberJoined(OnGroupUserJoinEvent)
 	h.OnGroupMemberLeaved(OnGroupUserQuitEvent)
-
 
 	//初始化任务计划
 	this.cronTask = cron.New()
@@ -103,6 +100,7 @@ func (this *Robot) registerEvent()  {
 	this.cronTask.Start()
 	StartHttpApi()
 }
+
 //机器人启动成功后触发
 func (this *Robot) OnRobotStart(e func(*Robot)) {
 	this.robotStartEvents = e
@@ -110,17 +108,12 @@ func (this *Robot) OnRobotStart(e func(*Robot)) {
 
 //添加任务计划
 func (this *Robot) AddTask(task api.Task) {
-	if err := this.cronTask.AddFunc(task.GetCron(),task.Call); err != nil {
-		logger.Warning("[任务计划] 添加失败: [%s] -> %s",task.GetCron(),err.Error())
-	}else{
-		logger.Info("[任务计划] 添加成功: [%s]",task.GetCron())
+	if err := this.cronTask.AddFunc(task.GetCron(), task.Call); err != nil {
+		logger.Warning("[任务计划] 添加失败: [%s] -> %s", task.GetCron(), err.Error())
+	} else {
+		logger.Info("[任务计划] 添加成功: [%s]", task.GetCron())
 	}
 }
-//添加群组模块
-func (this *Robot) AddGroupModule(module api.GroupMessageModule)  {
-
-}
-
 
 func (this *Robot) robotCommand(robot *Robot) {
 	logger.Info("现在可以输入指令来控制啦~")

@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/message"
+	"github.com/balrogsxt/xtbot-go/app"
+	"github.com/balrogsxt/xtbot-go/app/db"
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"github.com/imroc/req"
 	"io/ioutil"
 	"regexp"
+	"strconv"
 )
 
 var qqClient *client.QQClient = nil
@@ -100,12 +103,66 @@ func NewImage(groupId int64, id_file_url string) IMsg {
 
 ///////////主动API
 //发送群消息[自定义CQ码方式]
-func SendGroupMessageText() {
-	// at = [CQ:at,qq=123456]
-	// text = 文字内容
-	// image = [CQ:image,file=1.jpg] [CQ:image,file=http://xxxx.com/1.jpg]
-	// emoji = [CQ:emoji,id=1]
-	// 更多
+func SendGroupMessageText(groupId int64, text string) GroupMsgId {
+	/**
+	普通文字普通文字普通文字
+	[type=at,value=2289453456] = at指定
+	[type=at,value=0] = at全体
+	[type=emoji,]
+	[type=image,value={E4AD8A49-C2E8-1287-E5B3-559F7E5376AF}.PNG] = 发送图片ID
+	[type=image,value=./test/1.jpg] = 发送本地图片
+	*/
+	reg, _ := regexp.Compile("\\[type=.*?,value=.*?\\]|\\D")
+	list := reg.FindAllString(text, -1)
+
+	els := make([]IMsg, 0)
+
+	tmpText := ""
+	for _, txt := range list {
+		regex, _ := regexp.Compile("\\[type=(.*)?,value=(.*)?\\]")
+		item := regex.FindStringSubmatch(txt)
+		if len(item) >= 3 {
+			//如果匹配成功到了,结算文字
+			if len(tmpText) > 0 {
+				els = append(els, NewText(tmpText))
+				tmpText = ""
+			}
+
+			var elem IMsg
+
+			//判断类型
+			_type := item[1]
+			_value := item[2]
+
+			switch _type {
+			case "at":
+				elem = func(v string) IMsg {
+					if qq, e := strconv.ParseInt(v, 10, 64); e == nil {
+						return NewAt(qq)
+					} else {
+						return nil
+					}
+				}(_value)
+				break
+			case "image":
+				elem = func(v string) IMsg {
+					return NewImage(groupId, v)
+				}(_value)
+				break
+			}
+			if elem != nil {
+				els = append(els, elem)
+			}
+		} else {
+			tmpText += txt
+		}
+	}
+	//再次判断是否需要结算文字
+	if len(tmpText) > 0 {
+		els = append(els, NewText(tmpText))
+		tmpText = ""
+	}
+	return SendGroupMessage(groupId, els)
 }
 
 //发送群组消息[结构方式]
@@ -115,6 +172,7 @@ func SendGroupMessage(groupId int64, msg []IMsg) GroupMsgId {
 	result := message.SendingMessage{Elements: parseMsg}
 
 	m := qqClient.SendGroupMessage(groupId, &result)
+	go saveGroupMsg(groupId, msg, m)
 	return GroupMsgId{
 		MsgId: MsgId{
 			Id:         m.Id,
@@ -128,6 +186,35 @@ func SendGroupMessage(groupId int64, msg []IMsg) GroupMsgId {
 }
 
 //撤回群组消息
-func RecallGroupMessage(groupId int64, msgId MsgId) {
-	qqClient.RecallGroupMessage(groupId, msgId.Id, msgId.InternalId)
+func RecallGroupMessage(groupId int64, msgId int32) {
+	//查询数据库获取内部id
+	msg := new(db.GroupMsg)
+	has, err := app.GetDb().Where("msg_id = ?", msgId).Cols("internal_id").Get(msg)
+	if err != nil {
+		logger.Warning("[撤回消息] 获取内部消息Id失败: %s", err.Error())
+	}
+	if has {
+		qqClient.RecallGroupMessage(groupId, msgId, msg.InternalId)
+	}
+}
+
+//保存群组发送的消息
+func saveGroupMsg(groupId int64, list []IMsg, m *message.GroupMessage) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Warning("[群组消息保存] 保存消息发生错误: %s", err)
+		}
+	}()
+	msg := new(db.GroupMsg)
+	msg.MsgId = m.Id
+	msg.InternalId = m.InternalId
+	msg.Group = groupId
+	msg.QQ = qqClient.Uin //当前登录qq
+	msg.SendTime = m.Time
+	msg.MsgText = ToString(list)
+	msg.MsgJson = ToJson(list)
+
+	if _, err := app.GetDb().InsertOne(msg); err != nil {
+		logger.Warning("[群组消息保存] 保存消息发生错误: %s", err)
+	}
 }
