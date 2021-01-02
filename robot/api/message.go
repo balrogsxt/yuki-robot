@@ -12,7 +12,7 @@ import (
 
 var qqClient *client.QQClient = nil
 
-func SetLoginQQClient(client *client.QQClient)  {
+func SetLoginQQClient(client *client.QQClient) {
 	qqClient = client
 }
 
@@ -22,25 +22,27 @@ func NewText(content string) IMsg {
 		Content: content,
 	}
 }
+
 //At全体
 func NewAtAll() IMsg {
 	return At{
-		QQ: 0,
+		QQ:      0,
 		Display: "@全体成员",
 	}
 }
+
 //At用户
-func NewAt(qq int64,display ...string) IMsg {
-	show := fmt.Sprintf("@%d",qq)
-	if qq == 0{
+func NewAt(qq int64, display ...string) IMsg {
+	show := fmt.Sprintf("@%d", qq)
+	if qq == 0 {
 		show = "@全体成员"
 	}
 	if len(display) >= 1 {
-		show = fmt.Sprintf("@%s",display[0])
+		show = fmt.Sprintf("@%s", display[0])
 	}
 
 	return At{
-		QQ: qq,
+		QQ:      qq,
 		Display: show,
 	}
 }
@@ -53,32 +55,32 @@ func NewImageId(imageId string) IMsg {
 }
 
 //发送本地图片或指定ID图片
-func NewImage(groupId int64,id_file_url string) IMsg {
-	flag, _ := regexp.Match("^\\{[a-zA-Z0-9-]+\\}\\.(PNG|JPG|JPEG|GIF|BMP|WEBP)$",[]byte(id_file_url))
+func NewImage(groupId int64, id_file_url string) IMsg {
+	flag, _ := regexp.Match("^\\{[a-zA-Z0-9-]+\\}\\.(PNG|JPG|JPEG|GIF|BMP|WEBP)$", []byte(id_file_url))
 	if flag {
 		return Image{
 			Id: id_file_url,
 		}
 	}
 
-	flag,_ = regexp.Match("^http(s?)",[]byte(id_file_url))
+	flag, _ = regexp.Match("^http(s?)", []byte(id_file_url))
 	var _fileByte []byte = nil
 	var er error
 	if flag {
-		res,err := req.Get(id_file_url)
+		res, err := req.Get(id_file_url)
 		if err != nil {
-			logger.Warning("[群组图片] 远程请求失败: %s",err.Error())
+			logger.Warning("[群组图片] 远程请求失败: %s", err.Error())
 		}
-		_fileByte,er = res.ToBytes()
+		_fileByte, er = res.ToBytes()
 		if er != nil {
-			logger.Warning("[群组图片] 读取失败: %s",er.Error())
+			logger.Warning("[群组图片] 读取失败: %s", er.Error())
 			return nil
 		}
 
-	}else{
-		_fileByte,er = ioutil.ReadFile(id_file_url)
+	} else {
+		_fileByte, er = ioutil.ReadFile(id_file_url)
 		if er != nil {
-			logger.Warning("[群组图片] 读取失败: %s",er.Error())
+			logger.Warning("[群组图片] 读取失败: %s", er.Error())
 			return nil
 		}
 	}
@@ -86,9 +88,9 @@ func NewImage(groupId int64,id_file_url string) IMsg {
 		logger.Warning("[群组图片] 获取图片数据失败")
 		return nil
 	}
-	img,err := qqClient.UploadGroupImage(groupId,_fileByte)
+	img, err := qqClient.UploadGroupImage(groupId, _fileByte)
 	if err != nil {
-		logger.Warning("[群组图片] 上传失败: %s",err.Error())
+		logger.Warning("[群组图片] 上传失败: %s", err.Error())
 		return nil
 	}
 	return Image{
@@ -97,27 +99,35 @@ func NewImage(groupId int64,id_file_url string) IMsg {
 }
 
 ///////////主动API
+//发送群消息[自定义CQ码方式]
+func SendGroupMessageText() {
+	// at = [CQ:at,qq=123456]
+	// text = 文字内容
+	// image = [CQ:image,file=1.jpg] [CQ:image,file=http://xxxx.com/1.jpg]
+	// emoji = [CQ:emoji,id=1]
+	// 更多
+}
 
-//发送群组消息
-func SendGroupMessage(groupId int64,msg []IMsg) GroupMsgId {
+//发送群组消息[结构方式]
+func SendGroupMessage(groupId int64, msg []IMsg) GroupMsgId {
 
 	parseMsg := ParseToOldElement(msg)
 	result := message.SendingMessage{Elements: parseMsg}
 
-	m := qqClient.SendGroupMessage(groupId,&result)
+	m := qqClient.SendGroupMessage(groupId, &result)
 	return GroupMsgId{
-		MsgId:MsgId{
-			Id: m.Id,
+		MsgId: MsgId{
+			Id:         m.Id,
 			InternalId: m.InternalId,
 		},
-		Group:Group{
-			Id:m.GroupCode,
-			Name:m.GroupName,
+		Group: Group{
+			Id:   m.GroupCode,
+			Name: m.GroupName,
 		},
 	}
 }
 
 //撤回群组消息
-func RecallGroupMessage(groupId int64,msgId MsgId)  {
-	qqClient.RecallGroupMessage(groupId,msgId.Id,msgId.InternalId)
+func RecallGroupMessage(groupId int64, msgId MsgId) {
+	qqClient.RecallGroupMessage(groupId, msgId.Id, msgId.InternalId)
 }
