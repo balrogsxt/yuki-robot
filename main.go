@@ -37,7 +37,6 @@ func main() {
 	}
 
 	_robot.OnRobotStart(func(r *robot.Robot) {
-		fmt.Println("机器人启动成功")
 		//绑定任务计划
 		//r.AddTask(new(task.TestTask))
 	})

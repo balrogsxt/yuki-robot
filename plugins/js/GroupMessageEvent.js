@@ -8,6 +8,12 @@
 //     // {type:"image",value:"./draw.png"},//图片消息
 //     // {type:"image",value:"https://www.baidu.com/img/flexible/logo/pc/result.png"},//图片消息,自动判断
 // ])
+// msg = sendGroupMessageText(group,"发送消息[type=at,value=2289453456]")
+// console.log("msg=",msg)
+// sleep(1000)
+// recallGroupMessage(group,msg)
+
+
 
 // console.log("说了一句话:",event.msg_text)
 // var r = httpPost('http://api.acgxt.com/pingport',{

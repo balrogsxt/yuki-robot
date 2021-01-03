@@ -1,6 +1,7 @@
 package event
 
 import (
+	"fmt"
 	"github.com/balrogsxt/xtbot-go/app"
 	"github.com/balrogsxt/xtbot-go/app/db"
 	"github.com/balrogsxt/xtbot-go/app/script"
@@ -13,6 +14,7 @@ import (
 )
 
 var groupModules []api.GroupMessageModule
+var groupJsModules []api.GroupJsMessageModule
 
 func init() {
 	//初始化已封装的群组模块
@@ -20,6 +22,14 @@ func init() {
 
 	groupModules = append(groupModules, new(group.AddKey)) //添加关键字回复
 	groupModules = append(groupModules, new(group.DelKey)) //删除关键字回复
+	groupModules = append(groupModules, new(group.JsVm))   //运行js虚拟机
+
+	//js模块
+	groupJsModules = make([]api.GroupJsMessageModule, 0)
+	groupJsModules = append(groupJsModules, api.GroupJsMessageModule{
+		Command: "^test",
+		File:    "test.js",
+	})
 
 }
 
@@ -58,8 +68,7 @@ func (this *GroupMessageEvent) Call() {
 	if isDeny {
 		return
 	}
-	logger.Info("[群组消息] [%s](%d): %s", this.Group.Name, this.Group.Id, simpleMsg)
-
+	logger.Info("[群组消息] [%s](%d): %s", this.Group.Name, this.Group.Id, strings.ReplaceAll(simpleMsg, "\n", "<br/>"))
 	//处理群组模块能力
 
 	//处理go内置机器人功能
@@ -67,11 +76,54 @@ func (this *GroupMessageEvent) Call() {
 	for _, m := range groupModules {
 		flag, _ := regexp.MatchString(m.Command(), simpleMsg)
 		if flag {
-
 			reg, _ := regexp.Compile(m.Command())
 			value := reg.ReplaceAllString(simpleMsg, "")
 			value = strings.Trim(value, " ")
-			if m.Call(value, this.GroupMessageEventHandle) {
+			isCall = func() bool {
+				//错误捕捉
+				defer func() {
+
+				}()
+
+				if m.Call(value, this.GroupMessageEventHandle) {
+					return true
+				}
+				return false
+			}()
+			if isCall {
+				break
+			}
+
+		}
+	}
+	if isCall {
+		return
+	}
+
+	//js处理能力
+	jsDir := "./plugins/js/"
+	for _, m := range groupJsModules {
+		flag, _ := regexp.MatchString(m.Command, simpleMsg)
+		if flag {
+			reg, _ := regexp.Compile(m.Command)
+			value := reg.ReplaceAllString(simpleMsg, "")
+			value = strings.Trim(value, " ")
+			file := fmt.Sprintf("%s%s", jsDir, m.File)
+			if util.IsFile(file) {
+				js := script.NewJs()
+				js.SetVars("event", map[string]interface{}{
+					"value":     value,
+					"msg_id":    this.MsgId.MsgId.Id,
+					"group":     this.Group.Id,
+					"qq":        this.QQ.Uin,
+					"send_time": this.SendTime,
+					"msg_text":  api.ToString(this.MessageList),
+					"msg_json":  api.ToJson(this.MessageList),
+				})
+				_, err := js.RunFile(file)
+				if err != nil {
+					logger.Warning("[群组模块] Js虚拟机运行失败: %s", err.Error())
+				}
 				isCall = true
 				break //执行成功并且命中目标
 			}
@@ -81,22 +133,25 @@ func (this *GroupMessageEvent) Call() {
 		return
 	}
 
-	//提供给js虚拟机处理能力
-	gmeFile := "./plugins/js/GroupMessageEvent.js"
-	if util.IsFile(gmeFile) {
-		js := script.NewJs()
-		js.SetVars("event", map[string]interface{}{
-			"msg_id":    this.MsgId.MsgId.Id,
-			"group":     this.Group.Id,
-			"qq":        this.QQ.Uin,
-			"send_time": this.SendTime,
-			"msg_text":  api.ToString(this.MessageList),
-			"msg_json":  api.ToJson(this.MessageList),
-		})
-		if err := js.RunFile("./plugins/js/GroupMessageEvent.js"); err != nil {
-			logger.Warning("[群组模块] Js虚拟机运行失败: %s", err.Error())
-		}
+	//处理群组自定义关键字回复功能等
+	this.last(simpleMsg)
+}
+
+func (this *GroupMessageEvent) last(text string) {
+
+	//处理关键字回复
+
+	result := db.GroupReply{}
+
+	//随机指定一条回复,反向正向like查询关键词
+	has, err := app.GetDb().Where("`key` like ? or ? like CONCAT('%',`key`,'%')", "%"+text+"%", text).Cols("reply").OrderBy("rand()").Get(&result)
+	if err != nil {
+		logger.Warning("[群组回复] 查询群组关键词回复失败: %s", err.Error())
 	}
+	if !has {
+		return //没有回复词条
+	}
+	this.Group.SendGroupMessageText(result.Reply)
 
 }
 

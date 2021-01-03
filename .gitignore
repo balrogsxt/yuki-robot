@@ -7,3 +7,4 @@ main.exe
 /test
 !/config.yml
 !/draw.png
+/data

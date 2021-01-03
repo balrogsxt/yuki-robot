@@ -19,6 +19,9 @@ type RobotConfig struct {
 		Allow []int64 //支持接收消息的群组
 		Deny  []int64 //拒绝接收消息的群组
 	}
+	QQ struct {
+		Deny []int64 //拒绝接收消息的QQ(包括群组内)
+	}
 	Cache struct { //缓存模块
 		//支持的缓存模块配置
 		//redis

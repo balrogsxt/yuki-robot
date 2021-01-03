@@ -6,6 +6,7 @@ import (
 	"github.com/Mrs4s/MiraiGo/message"
 	"github.com/balrogsxt/xtbot-go/app"
 	"github.com/balrogsxt/xtbot-go/app/db"
+	"github.com/balrogsxt/xtbot-go/util"
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"github.com/imroc/req"
 	"io/ioutil"
@@ -62,6 +63,68 @@ func NewImageId(imageId string) IMsg {
 func ImageCode(id_url_file string) string {
 	return fmt.Sprintf("[type=image,value=%s]", id_url_file)
 }
+func NewAudio(groupId int64, id_file_url string) IMsg {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("异常: ", err)
+		}
+	}()
+	var _fileByte []byte = nil
+	var er error
+
+	flag, _ := regexp.Match("^\\{[a-zA-Z0-9-]+\\}\\.(amr)$", []byte(id_file_url))
+	flag2, _ := regexp.Match("^http(s?)", []byte(id_file_url))
+	if flag {
+		//读取本地缓存语音
+		cacheFile := fmt.Sprintf("%s%s.amr", app.Audios, util.Md5String(id_file_url))
+		if util.IsFile(cacheFile) {
+			_fileByte, er = ioutil.ReadFile(cacheFile)
+			if er != nil {
+				logger.Warning("[群组语音] 读取本地缓存失败: %s", er.Error())
+				return nil
+			}
+		} else {
+			logger.Warning("[群组语音] 缓存文件不存在: %s", cacheFile)
+			return nil
+		}
+	} else if flag2 {
+		res, err := req.Get(id_file_url)
+		if err != nil {
+			logger.Warning("[群组语音] 远程请求失败: %s", err.Error())
+			return nil
+		}
+		_fileByte, er = res.ToBytes()
+		if er != nil {
+			logger.Warning("[群组语音] 读取失败: %s", er.Error())
+			return nil
+		}
+	} else {
+		if util.IsFile(id_file_url) {
+			_fileByte, er = ioutil.ReadFile(id_file_url)
+			if er != nil {
+				logger.Warning("[群组语音] 读取失败: %s", er.Error())
+				return nil
+			}
+		} else {
+			logger.Warning("[群组语音] 找不到语音文件: %s", id_file_url)
+		}
+	}
+
+	if _fileByte == nil {
+		logger.Warning("[群组图片] 获取图片数据失败")
+		return nil
+	}
+
+	a, err := qqClient.UploadGroupPtt(groupId, _fileByte)
+	if err != nil {
+		logger.Warning("[群组语音] 上传失败: %s", err.Error())
+		return nil
+	}
+	return Audio{
+		Data: a.Data,
+		Ptt:  a.Ptt,
+	}
+}
 
 //发送本地图片或指定ID图片
 func NewImage(groupId int64, id_file_url string) IMsg {
@@ -79,6 +142,7 @@ func NewImage(groupId int64, id_file_url string) IMsg {
 		res, err := req.Get(id_file_url)
 		if err != nil {
 			logger.Warning("[群组图片] 远程请求失败: %s", err.Error())
+			return nil
 		}
 		_fileByte, er = res.ToBytes()
 		if er != nil {
@@ -97,6 +161,7 @@ func NewImage(groupId int64, id_file_url string) IMsg {
 		logger.Warning("[群组图片] 获取图片数据失败")
 		return nil
 	}
+
 	img, err := qqClient.UploadGroupImage(groupId, _fileByte)
 	if err != nil {
 		logger.Warning("[群组图片] 上传失败: %s", err.Error())
@@ -114,7 +179,7 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 	普通文字普通文字普通文字
 	[type=at,value=2289453456] = at指定
 	[type=at,value=0] = at全体
-	[type=emoji,]
+	[type=face,id=100]
 	[type=image,value={E4AD8A49-C2E8-1287-E5B3-559F7E5376AF}.PNG] = 发送图片ID
 	[type=image,value=./test/1.jpg] = 发送本地图片
 	*/
@@ -130,7 +195,7 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 		if len(item) >= 3 {
 			//如果匹配成功到了,结算文字
 			if len(tmpText) > 0 {
-				els = append(els, NewText(tmpText))
+				els = append(els, NewText(CQCodeUnescapeText(tmpText)))
 				tmpText = ""
 			}
 
@@ -155,6 +220,11 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 					return NewImage(groupId, v)
 				}(_value)
 				break
+			case "audio":
+				elem = func(v string) IMsg {
+					return NewAudio(groupId, v)
+				}(_value)
+				break
 			}
 			if elem != nil {
 				els = append(els, elem)
@@ -165,7 +235,7 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 	}
 	//再次判断是否需要结算文字
 	if len(tmpText) > 0 {
-		els = append(els, NewText(tmpText))
+		els = append(els, NewText(CQCodeUnescapeText(tmpText)))
 		tmpText = ""
 	}
 	return SendGroupMessage(groupId, els)
@@ -173,7 +243,6 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 
 //发送群组消息[结构方式]
 func SendGroupMessage(groupId int64, msg []IMsg) GroupMsgId {
-
 	parseMsg := ParseToOldElement(msg)
 	result := message.SendingMessage{Elements: parseMsg}
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/Mrs4s/MiraiGo/client/pb/msg"
 	"github.com/Mrs4s/MiraiGo/message"
 	"github.com/balrogsxt/xtbot-go/util"
 	"strings"
@@ -22,7 +23,7 @@ type (
 	Image struct {
 		Id string //所处在腾讯的图片ID
 	}
-	Emoji struct {
+	Face struct {
 		Name string //显示名称
 		Id   int32  //faceId
 	}
@@ -31,13 +32,21 @@ type (
 		QQ      int64  //At的QQ号码,为0时为@All
 		Display string //显示的名称
 	}
+	Audio struct {
+		Id   string
+		Data []byte //音频byte
+		Ptt  *msg.Ptt
+	}
 )
 
+func (Audio) Type() string {
+	return "audio"
+}
 func (Text) Type() string {
 	return "text"
 }
-func (Emoji) Type() string {
-	return "emoji"
+func (Face) Type() string {
+	return "face"
 }
 func (At) Type() string {
 	return "at"
@@ -52,13 +61,16 @@ func ToString(list []IMsg) string {
 	for _, elem := range list {
 		switch e := elem.(type) {
 		case Text:
-			str += e.Content
+			str += CQCodeEscapeText(e.Content)
 			break
 		case Image:
 			str += fmt.Sprintf("[type=image,value=%s]", e.Id)
 			break
-		case Emoji:
-			str += fmt.Sprintf("[type=emoji,value=%d]", e.Id)
+		case Audio:
+			str += fmt.Sprintf("[type=audio,value=%s]", e.Id)
+			break
+		case Face:
+			str += fmt.Sprintf("[type=face,value=%d]", e.Id)
 			break
 		case At:
 			str += fmt.Sprintf("[type=at,value=%d]", e.QQ)
@@ -74,7 +86,7 @@ func ToJson(list []IMsg) string {
 		case Text:
 			_list = append(_list, map[string]interface{}{
 				"type":  "text",
-				"value": e.Content,
+				"value": CQCodeEscapeText(e.Content),
 			})
 			break
 		case Image:
@@ -83,9 +95,14 @@ func ToJson(list []IMsg) string {
 				"value": e.Id,
 			})
 			break
-		case Emoji:
+		case Audio:
 			_list = append(_list, map[string]interface{}{
-				"type":  "emoji",
+				"type":  "audio",
+				"value": e.Id,
+			})
+		case Face:
+			_list = append(_list, map[string]interface{}{
+				"type":  "face",
 				"value": e.Id,
 			})
 			break
@@ -106,14 +123,20 @@ func ParseToOldElement(elements []IMsg) []message.IMessageElement {
 	for _, elem := range elements {
 		switch e := elem.(type) {
 		case Text:
-			list = append(list, message.NewText(e.Content))
+			list = append(list, message.NewText(CQCodeUnescapeText(e.Content)))
 			break
 		case Image:
 			list = append(list, &message.ImageElement{
 				Filename: e.Id,
 			})
 			break
-		case Emoji:
+		case Audio:
+			list = append(list, &message.GroupVoiceElement{
+				Data: e.Data,
+				Ptt:  e.Ptt,
+			})
+			break
+		case Face:
 			list = append(list, message.NewFace(e.Id))
 			break
 		case At:
@@ -121,6 +144,7 @@ func ParseToOldElement(elements []IMsg) []message.IMessageElement {
 			break
 		}
 	}
+	fmt.Printf("%#v \n", list)
 	return list
 }
 
@@ -140,15 +164,21 @@ func ParseElement(elements []message.IMessageElement) []IMsg {
 				Id: e.Filename,
 			})
 			break
-		case *message.FaceElement:
-			list = append(list, Emoji{
-				Name: e.Name,
-				Id:   e.Index,
-			})
-			break
 		case *message.GroupImageElement:
 			list = append(list, Image{
 				Id: e.ImageId,
+			})
+			break
+		case *message.VoiceElement:
+			list = append(list, Audio{
+				Id:   e.Name,
+				Data: e.Data,
+			})
+			break
+		case *message.FaceElement:
+			list = append(list, Face{
+				Name: e.Name,
+				Id:   e.Index,
 			})
 			break
 		case *message.AtElement:
@@ -229,4 +259,24 @@ func (this *Group) RecallGroupMessage(msgId int32) {
 //快速获取图片数据
 func (this *Group) NewImage(id_path_url string) IMsg {
 	return NewImage(this.Id, id_path_url)
+}
+
+//快速获取语音数据
+func (this *Group) NewAudio(id_path_url string) IMsg {
+	return NewAudio(this.Id, id_path_url)
+}
+
+func CQCodeEscapeText(raw string) string {
+	ret := raw
+	ret = strings.ReplaceAll(ret, "&", "&amp;")
+	ret = strings.ReplaceAll(ret, "[", "&#91;")
+	ret = strings.ReplaceAll(ret, "]", "&#93;")
+	return ret
+}
+func CQCodeUnescapeText(content string) string {
+	ret := content
+	ret = strings.ReplaceAll(ret, "&#91;", "[")
+	ret = strings.ReplaceAll(ret, "&#93;", "]")
+	ret = strings.ReplaceAll(ret, "&amp;", "&")
+	return ret
 }

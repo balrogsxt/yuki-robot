@@ -6,6 +6,8 @@ function sendGroupMessageText(groupId,text){}
 function recallGroupMessage(groupId,msgId){}
 //用于延迟执行的函数,参数毫秒,替换setTimeout
 function sleep(ms){}
+//延迟执行的闭包回调
+function setTimeout(callback){}
 //发送httpGet请求
 function httpGet(url,header){}
 //发送httpPost formdata请求

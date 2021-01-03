@@ -11,7 +11,9 @@ import (
 )
 
 type Javascript struct {
-	vm *otto.Otto
+	vm        *otto.Otto
+	firstCode string
+	result    string
 }
 
 func NewJs() *Javascript {
@@ -23,6 +25,7 @@ func NewJs() *Javascript {
 }
 func (this *Javascript) bindInternalFunctions() {
 	this.vm = otto.New()
+	this.vm.Interrupt = make(chan func(), 1)
 	jsfn := NewJsFn(this.vm)
 
 	//发送群消息
@@ -33,17 +36,51 @@ func (this *Javascript) bindInternalFunctions() {
 	this.vm.Set("recallGroupMessage", jsfn.fn_recallGroupMessage)
 	//延迟函数,由于setTimeout无法再虚拟机中使用
 	this.vm.Set("sleep", jsfn.fn_sleep)
+	this.vm.Set("setTimeout", jsfn.fn_sleep)
 	//提供http get方法
 	this.vm.Set("httpGet", jsfn.fn_http_get)
 	//提供http post formdata、json方法
 	this.vm.Set("httpPost", jsfn.fn_http_post_formdata)
 	this.vm.Set("httpPostJson", jsfn.fn_http_post_json)
 
+	this.vm.Set("__log__", func(call otto.FunctionCall) otto.Value {
+		m := ""
+		for _, v := range call.ArgumentList {
+			m = fmt.Sprintf("%s %s", m, v.String())
+		}
+		//储存,当运行完成后作为返回值
+		this.result += fmt.Sprintf("\n%s", m)
+		return otto.Value{}
+	})
+	this.firstCode = `console.log = __log__;`
+
 }
 func (this *Javascript) SetVars(name string, vars map[string]interface{}) {
 	this.vm.Set(name, vars)
 }
-func (this *Javascript) RunFile(file string) (e error) {
+
+func (this *Javascript) RunCode(code string, timeout int64) (r string, e error) {
+	this.result = ""
+	defer func() {
+		if err := recover(); err != nil {
+			e = errors.New(fmt.Sprintf("[群组模块] Js虚拟机运行失败: %s", err))
+		}
+	}()
+	go func() {
+		time.Sleep(time.Millisecond * time.Duration(timeout))
+		this.vm.Interrupt <- func() {
+			e = errors.New(fmt.Sprintf("[群组模块] Js虚拟机运行失败: 运行超时!"))
+			panic("运行超时")
+		}
+	}()
+
+	if _, err := this.vm.Run(fmt.Sprintf("%s%s", this.firstCode, code)); err != nil {
+		return "", err
+	}
+	return this.result, e
+}
+func (this *Javascript) RunFile(file string) (r string, e error) {
+	this.result = ""
 	defer func() {
 		if err := recover(); err != nil {
 			e = errors.New(fmt.Sprintf("[群组模块] Js虚拟机运行失败: %s", err))
@@ -51,13 +88,13 @@ func (this *Javascript) RunFile(file string) (e error) {
 	}()
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return err
+		return "", err
 	}
 	code := string(b)
-	if _, err := this.vm.Run(code); err != nil {
-		return err
+	if _, err := this.vm.Run(fmt.Sprintf("%s%s", this.firstCode, code)); err != nil {
+		return "", err
 	}
-	return nil
+	return this.result, nil
 }
 
 type JsFn struct {
@@ -79,6 +116,13 @@ func (this *JsFn) fn_sleep(call otto.FunctionCall) otto.Value {
 		return otto.Value{}
 	}
 	time.Sleep(time.Millisecond * time.Duration(ms))
+	return otto.Value{}
+}
+func (this *JsFn) fn_setTimeout(call otto.FunctionCall) otto.Value {
+	//if call.IsFunction(){
+	//	time.Sleep(time.Millisecond * time.Duration(ms))
+	//	call.Call(otto.UndefinedValue())
+	//}
 	return otto.Value{}
 }
 

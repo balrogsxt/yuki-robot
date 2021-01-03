@@ -7,8 +7,10 @@ import (
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/balrogsxt/xtbot-go/app"
 	"github.com/balrogsxt/xtbot-go/robot/api"
+	"github.com/balrogsxt/xtbot-go/util"
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"github.com/robfig/cron"
+	"io/ioutil"
 	"os"
 	"time"
 )
@@ -23,6 +25,15 @@ type Robot struct {
 
 }
 
+type protocol int
+
+const (
+	AndroidPhone = protocol(client.AndroidPhone)
+	IPad         = protocol(client.IPad)
+	AndroidWatch = protocol(client.AndroidWatch)
+	MacOS        = protocol(client.MacOS)
+)
+
 //创建新的机器人
 func NewRobot() (*Robot, error) {
 	robot := new(Robot)
@@ -32,9 +43,28 @@ func NewRobot() (*Robot, error) {
 	}
 	robot.Config = conf
 
+	client.SystemDeviceInfo.Protocol = client.ClientProtocol(AndroidPhone)
+
 	return robot, nil
 }
 func (this *Robot) Run() {
+
+	//虚拟设备信息绑定
+	if !util.IsFile("device.json") {
+		logger.Warning("虚拟设备信息不存在,自动创建...")
+		client.GenRandomDevice()
+		_ = ioutil.WriteFile("device.json", client.SystemDeviceInfo.ToJson(), 0644)
+		logger.Info("已生成虚拟设备信息到 device.json")
+	} else {
+		_b, err := ioutil.ReadFile("device.json")
+		if err != nil {
+			logger.Fatal("获取虚拟设备信息失败: %s", err.Error())
+		}
+		if err := client.SystemDeviceInfo.ReadJson(_b); err != nil {
+			logger.Fatal("使用虚拟设备信息失败: %s", err.Error())
+		}
+	}
+	//准备开始登录
 	if err := this.login(); err != nil {
 		//首次登录失败,则直接异常结束
 		logger.Fatal("[登录失败] 登录QQ账户失败: %s", err.Error())
@@ -55,6 +85,7 @@ func (this *Robot) login() error {
 	if !res.Success {
 		switch res.Error {
 		case client.OtherLoginError:
+			fmt.Printf("%#v \n", res)
 			return errors.New(fmt.Sprintf("登录错误:%s【请检查账户密码是否正确】", res.ErrorMessage))
 		case client.SMSNeededError, client.NeedCaptcha, client.SMSOrVerifyNeededError:
 			fmt.Printf("\n%s\n\n", res.VerifyUrl)
