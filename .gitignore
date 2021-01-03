@@ -5,4 +5,5 @@ config.yml
 main.exe
 /bin
 /test
-draw.png
+!/config.yml
+!/draw.png

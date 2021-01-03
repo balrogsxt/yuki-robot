@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/message"
 	"github.com/balrogsxt/xtbot-go/util"
+	"strings"
 )
 
 type IMsg interface {
@@ -64,7 +65,7 @@ func ToString(list []IMsg) string {
 			break
 		}
 	}
-	return str
+	return strings.Trim(str, " ")
 }
 func ToJson(list []IMsg) string {
 	_list := make([]map[string]interface{}, 0)
@@ -215,6 +216,9 @@ type Group struct {
 //发送群组消息
 func (this *Group) SendGroupMessage(list []IMsg) GroupMsgId {
 	return SendGroupMessage(this.Id, list)
+}
+func (this *Group) SendGroupMessageText(text string) GroupMsgId {
+	return SendGroupMessageText(this.Id, text)
 }
 
 //撤回群组消息

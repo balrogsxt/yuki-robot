@@ -9,7 +9,7 @@
 //     // {type:"image",value:"https://www.baidu.com/img/flexible/logo/pc/result.png"},//图片消息,自动判断
 // ])
 
-console.log("说了一句话:",event.msg_text)
+// console.log("说了一句话:",event.msg_text)
 // var r = httpPost('http://api.acgxt.com/pingport',{
 //     "User-Agent":"123123",
 //     "User-Agent22":"123123",

@@ -1,13 +1,15 @@
 package event
 
 import (
-	"fmt"
 	"github.com/balrogsxt/xtbot-go/app"
 	"github.com/balrogsxt/xtbot-go/app/db"
 	"github.com/balrogsxt/xtbot-go/app/script"
 	"github.com/balrogsxt/xtbot-go/robot/api"
 	"github.com/balrogsxt/xtbot-go/service/module/group"
+	"github.com/balrogsxt/xtbot-go/util"
 	"github.com/balrogsxt/xtbot-go/util/logger"
+	"regexp"
+	"strings"
 )
 
 var groupModules []api.GroupMessageModule
@@ -17,6 +19,7 @@ func init() {
 	groupModules = make([]api.GroupMessageModule, 0)
 
 	groupModules = append(groupModules, new(group.AddKey)) //添加关键字回复
+	groupModules = append(groupModules, new(group.DelKey)) //删除关键字回复
 
 }
 
@@ -57,52 +60,43 @@ func (this *GroupMessageEvent) Call() {
 	}
 	logger.Info("[群组消息] [%s](%d): %s", this.Group.Name, this.Group.Id, simpleMsg)
 
-	js := script.NewJs()
-	js.SetVars("event", map[string]interface{}{
-		"msg_id":    this.MsgId.MsgId.Id,
-		"group":     this.Group.Id,
-		"qq":        this.QQ.Uin,
-		"send_time": this.SendTime,
-		"msg_text":  api.ToString(this.MessageList),
-		"msg_json":  api.ToJson(this.MessageList),
-	})
-	if err := js.RunFile("./plugins/js/GroupMessageEvent.js"); err != nil {
-		fmt.Println("运行失败:" + err.Error() + " \n")
+	//处理群组模块能力
+
+	//处理go内置机器人功能
+	var isCall bool = false
+	for _, m := range groupModules {
+		flag, _ := regexp.MatchString(m.Command(), simpleMsg)
+		if flag {
+
+			reg, _ := regexp.Compile(m.Command())
+			value := reg.ReplaceAllString(simpleMsg, "")
+			value = strings.Trim(value, " ")
+			if m.Call(value, this.GroupMessageEventHandle) {
+				isCall = true
+				break //执行成功并且命中目标
+			}
+		}
+	}
+	if isCall {
+		return
 	}
 
-	////调用JS
-	//node := script.NewNodeJs()
-	//
-	//node.SetVars(map[interface{}]interface{}{
-	//	"msg_id":this.MsgId,
-	//	"group":this.Group,
-	//	"qq":this.QQ,
-	//	"msg":this.MessageList,
-	//	"send_time":this.SendTime,
-	//	//"group_id":this.Group.Id,
-	//	//"group_name":this.Group.Name,
-	//	//"send_qq":this.QQ.Uin,
-	//	//"send_nickname":this.QQ.Name,
-	//	//"send_cardname":this.QQ.CardName,
-	//	//"msg_text":api.ToString(this.MessageList),
-	//	//"send_time":this.SendTime,
-	//})
-	//
-	//
-	//if err := node.RunFile("./plugins/nodejs/GroupMessageEvent.js"); err != nil {
-	//	fmt.Println("运行失败:" + err.Error() +" \n")
-	//}
-
-	//处理群组模块
-
-	//for _,m := range groupModules {
-	//	flag,_ := regexp.MatchString(m.Command(),simpleMsg)
-	//	if flag {
-	//		if m.Call() {
-	//			break //执行成功并且命中目标
-	//		}
-	//	}
-	//}
+	//提供给js虚拟机处理能力
+	gmeFile := "./plugins/js/GroupMessageEvent.js"
+	if util.IsFile(gmeFile) {
+		js := script.NewJs()
+		js.SetVars("event", map[string]interface{}{
+			"msg_id":    this.MsgId.MsgId.Id,
+			"group":     this.Group.Id,
+			"qq":        this.QQ.Uin,
+			"send_time": this.SendTime,
+			"msg_text":  api.ToString(this.MessageList),
+			"msg_json":  api.ToJson(this.MessageList),
+		})
+		if err := js.RunFile("./plugins/js/GroupMessageEvent.js"); err != nil {
+			logger.Warning("[群组模块] Js虚拟机运行失败: %s", err.Error())
+		}
+	}
 
 }
 

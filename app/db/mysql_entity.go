@@ -12,3 +12,14 @@ type GroupMsg struct {
 	MsgText    string `xorm:"msg_text"`  //字符串格式的消息
 	MsgJson    string `xorm:"msg_json"`  //json字符串格式的消息
 }
+
+type GroupReply struct {
+	Id     int
+	Key    string
+	Reply  string
+	Time   int32
+	Group  int64
+	QQ     int64 `xorm:"qq"`
+	Global int
+	Md5    string
+}

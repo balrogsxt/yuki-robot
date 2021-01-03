@@ -10,6 +10,7 @@ import (
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"github.com/robfig/cron"
 	"os"
+	"time"
 )
 
 type Robot struct {
@@ -33,9 +34,17 @@ func NewRobot() (*Robot, error) {
 
 	return robot, nil
 }
+func (this *Robot) Run() {
+	if err := this.login(); err != nil {
+		//首次登录失败,则直接异常结束
+		logger.Fatal("[登录失败] 登录QQ账户失败: %s", err.Error())
+	}
+	this.robotCommand()
+
+}
 
 //登录机器人账户
-func (this *Robot) Login() error {
+func (this *Robot) login() error {
 	config := this.Config
 	pwd := config.User.Password
 	_client := client.NewClient(config.User.QQ, pwd)
@@ -56,35 +65,34 @@ func (this *Robot) Login() error {
 	}
 	this.Handle = _client
 
+	_client.OnDisconnected(func(qqClient *client.QQClient, event *client.ClientDisconnectedEvent) {
+		api.SetLoginQQClient(nil) //设定登录失效
+		this.cronTask.Stop()      //停止任务计划
+		logger.Error("[账户离线] %s", event.Message)
+		//重新连接
+		for {
+			if err := this.login(); err != nil {
+				logger.Fatal("[账户重连] 重新连接QQ失败: %s -> 预计60秒后尝试重新连接", err.Error())
+				//重连失败,60秒后重试
+				time.Sleep(time.Second * 60)
+			} else {
+				logger.Info("[重新登录] %s(%d) 已重新登录成功!", _client.Nickname, _client.Uin)
+				break
+			}
+		}
+	})
+
 	api.SetLoginQQClient(_client)
 
-	logger.Info("%s(%d) 已登录成功!", _client.Nickname, _client.Uin)
+	logger.Info("[登录成功] %s(%d) 已登录成功!", _client.Nickname, _client.Uin)
+	this.registerEvent() //注册客户端相关事件
 
-	//加载群组
-	groupList, err := _client.GetGroupList()
-	if err == nil {
-		for _, group := range groupList {
-			logger.Info("[群组加载] %s(%d)", group.Name, group.Uin)
-		}
-	} else {
-		logger.Warning("[群组加载失败] %s", err.Error())
-	}
-
-	this.registerEvent()
-
-	this.robotCommand(this)
 	return nil
 }
 
 //注册消息事件
 func (this *Robot) registerEvent() {
 	h := this.Handle
-
-	h.OnDisconnected(func(qqClient *client.QQClient, event *client.ClientDisconnectedEvent) {
-		api.SetLoginQQClient(nil) //设定登录失效
-		this.cronTask.Stop()      //停止任务计划
-		logger.Fatal("[账户离线] %s", event.Message)
-	})
 	//注册群组相关事件
 	h.OnGroupMessage(OnGroupMessageEvent)               //群消息接收事件
 	h.OnGroupMessageRecalled(OnGroupMessageRecallEvent) //群消息撤回事件
@@ -98,7 +106,6 @@ func (this *Robot) registerEvent() {
 		this.robotStartEvents(this)
 	}
 	this.cronTask.Start()
-	StartHttpApi()
 }
 
 //机器人启动成功后触发
@@ -115,8 +122,9 @@ func (this *Robot) AddTask(task api.Task) {
 	}
 }
 
-func (this *Robot) robotCommand(robot *Robot) {
-	logger.Info("现在可以输入指令来控制啦~")
+func (this *Robot) robotCommand() {
+	logger.Info("[命令模式] 命令模式已启动")
+	fmt.Println()
 	for {
 		input := bufio.NewScanner(os.Stdin)
 		input.Scan()
@@ -125,12 +133,11 @@ func (this *Robot) robotCommand(robot *Robot) {
 		switch text {
 		case "stop":
 			logger.Info("正在退出...")
-			robot.Handle.Disconnect()
+			this.Handle.Disconnect()
 			logger.Info("已退出QQ")
 			return
 		default:
 			logger.Info("还不支持的命令: %s", text)
 		}
-
 	}
 }

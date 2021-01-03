@@ -7,9 +7,8 @@ type RobotEventHandle interface {
 	Call()
 }
 
-
-func SetRecover()  {
-	if err := recover();err != nil {
-		logger.Fatal("[事件异常] %s",err)
+func SetRecover() {
+	if err := recover(); err != nil {
+		logger.Error("[事件异常] %s", err)
 	}
 }

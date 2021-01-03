@@ -1,9 +1,9 @@
 package script
 
 import (
+	"errors"
 	"fmt"
 	"github.com/balrogsxt/xtbot-go/robot/api"
-	"github.com/balrogsxt/xtbot-go/util/logger"
 	"github.com/imroc/req"
 	"github.com/robertkrimen/otto"
 	"io/ioutil"
@@ -43,10 +43,10 @@ func (this *Javascript) bindInternalFunctions() {
 func (this *Javascript) SetVars(name string, vars map[string]interface{}) {
 	this.vm.Set(name, vars)
 }
-func (this *Javascript) RunFile(file string) error {
+func (this *Javascript) RunFile(file string) (e error) {
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Warning("[Js虚拟机] 运行Js脚本失败: %s", err)
+			e = errors.New(fmt.Sprintf("[群组模块] Js虚拟机运行失败: %s", err))
 		}
 	}()
 	b, err := ioutil.ReadFile(file)

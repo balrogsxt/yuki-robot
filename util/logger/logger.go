@@ -18,11 +18,11 @@ func (s *LoggerFormat) Format(entry *log.Entry) ([]byte, error) {
 	switch entry.Level {
 	case log.InfoLevel:
 		color = "a"
-		level = "INFO "
+		level = "INFO"
 		break
 	case log.WarnLevel:
 		color = "e"
-		level = "WARN "
+		level = "WARN"
 		break
 	case log.ErrorLevel:
 		color = "c"

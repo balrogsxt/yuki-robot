@@ -49,12 +49,18 @@ func NewAt(qq int64, display ...string) IMsg {
 		Display: show,
 	}
 }
+func AtCode(qq int64) string {
+	return fmt.Sprintf("[type=at,value=%d]", qq)
+}
 
 //发送指定ID图片
 func NewImageId(imageId string) IMsg {
 	return Image{
 		Id: imageId,
 	}
+}
+func ImageCode(id_url_file string) string {
+	return fmt.Sprintf("[type=image,value=%s]", id_url_file)
 }
 
 //发送本地图片或指定ID图片
@@ -112,7 +118,7 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 	[type=image,value={E4AD8A49-C2E8-1287-E5B3-559F7E5376AF}.PNG] = 发送图片ID
 	[type=image,value=./test/1.jpg] = 发送本地图片
 	*/
-	reg, _ := regexp.Compile("\\[type=.*?,value=.*?\\]|\\D")
+	reg, _ := regexp.Compile("\\[type=.*?,value=.*?\\]|\\D|\\d")
 	list := reg.FindAllString(text, -1)
 
 	els := make([]IMsg, 0)
