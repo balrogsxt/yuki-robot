@@ -1,9 +1,9 @@
 package api
 
 import (
-	"fmt"
 	"github.com/Mrs4s/MiraiGo/client/pb/msg"
 	"github.com/Mrs4s/MiraiGo/message"
+	"github.com/balrogsxt/xtbot-go/robot/cq"
 	"github.com/balrogsxt/xtbot-go/util"
 	"strings"
 )
@@ -64,16 +64,16 @@ func ToString(list []IMsg) string {
 			str += CQCodeEscapeText(e.Content)
 			break
 		case Image:
-			str += fmt.Sprintf("[type=image,value=%s]", e.Id)
+			str += cq.Image(e.Id)
 			break
 		case Audio:
-			str += fmt.Sprintf("[type=audio,value=%s]", e.Id)
+			str += cq.Record(e.Id)
 			break
 		case Face:
-			str += fmt.Sprintf("[type=face,value=%d]", e.Id)
+			str += cq.Face(e.Id)
 			break
 		case At:
-			str += fmt.Sprintf("[type=at,value=%d]", e.QQ)
+			str += cq.At(e.QQ)
 			break
 		}
 	}
@@ -85,31 +85,31 @@ func ToJson(list []IMsg) string {
 		switch e := elem.(type) {
 		case Text:
 			_list = append(_list, map[string]interface{}{
-				"type":  "text",
-				"value": CQCodeEscapeText(e.Content),
+				"type":    "text",
+				"content": CQCodeEscapeText(e.Content),
 			})
 			break
 		case Image:
 			_list = append(_list, map[string]interface{}{
-				"type":  "image",
-				"value": e.Id,
+				"type": "image",
+				"file": e.Id,
 			})
 			break
 		case Audio:
 			_list = append(_list, map[string]interface{}{
-				"type":  "audio",
-				"value": e.Id,
+				"type": "record",
+				"file": e.Id,
 			})
 		case Face:
 			_list = append(_list, map[string]interface{}{
-				"type":  "face",
-				"value": e.Id,
+				"type": "face",
+				"id":   e.Id,
 			})
 			break
 		case At:
 			_list = append(_list, map[string]interface{}{
-				"type":  "at",
-				"value": e.QQ,
+				"type": "at",
+				"qq":   e.QQ,
 			})
 			break
 		}
@@ -144,7 +144,6 @@ func ParseToOldElement(elements []IMsg) []message.IMessageElement {
 			break
 		}
 	}
-	fmt.Printf("%#v \n", list)
 	return list
 }
 

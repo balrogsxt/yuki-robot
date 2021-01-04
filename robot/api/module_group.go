@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"github.com/balrogsxt/xtbot-go/app"
 )
 
@@ -15,6 +16,17 @@ func GetGroupAllow() []int64 {
 func GetGroupDeny() []int64 {
 	conf := app.GetRobotConfig()
 	return conf.Group.Deny
+}
+
+//模块异常
+type GroupMessageModuleException struct {
+	Message string
+}
+
+func NewGroupException(format string, args ...interface{}) {
+	ex := new(GroupMessageModuleException)
+	ex.Message = fmt.Sprintf(format, args...)
+	panic(ex)
 }
 
 //群组消息接收事件模块接口

@@ -140,7 +140,6 @@ func RunCacheMsg(elements []message.IMessageElement) {
 		if !util.IsDir(app.Audios) {
 			os.MkdirAll(app.Audios, 0644)
 		}
-		fmt.Printf(imageId)
 		name := fmt.Sprintf("%s%s.amr", app.Audios, util.Md5String(imageId))
 		res, err := req.Get(url)
 		if err == nil {

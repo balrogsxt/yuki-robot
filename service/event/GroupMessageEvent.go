@@ -6,11 +6,13 @@ import (
 	"github.com/balrogsxt/xtbot-go/app/db"
 	"github.com/balrogsxt/xtbot-go/app/script"
 	"github.com/balrogsxt/xtbot-go/robot/api"
+	"github.com/balrogsxt/xtbot-go/robot/cq"
 	"github.com/balrogsxt/xtbot-go/service/module/group"
 	"github.com/balrogsxt/xtbot-go/util"
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var groupModules []api.GroupMessageModule
@@ -82,7 +84,18 @@ func (this *GroupMessageEvent) Call() {
 			isCall = func() bool {
 				//错误捕捉
 				defer func() {
-
+					if err := recover(); err != nil {
+						exception, has := err.(api.GroupMessageModuleException)
+						exmsg := cq.At(this.QQ.Uin) + "模块执行失败~"
+						if has {
+							exmsg = exception.Message
+						}
+						m := api.SendGroupMessageText(this.Group.Id, exmsg)
+						go func() {
+							time.Sleep(time.Millisecond * 5000)
+							api.RecallGroupMessage(this.Group.Id, m.MsgId.Id)
+						}()
+					}
 				}()
 
 				if m.Call(value, this.GroupMessageEventHandle) {
@@ -120,10 +133,12 @@ func (this *GroupMessageEvent) Call() {
 					"msg_text":  api.ToString(this.MessageList),
 					"msg_json":  api.ToJson(this.MessageList),
 				})
-				_, err := js.RunFile(file)
+				ret, err := js.RunFile(file)
 				if err != nil {
 					logger.Warning("[群组模块] Js虚拟机运行失败: %s", err.Error())
 				}
+				//脚本模块运行结果在控制台输出
+				fmt.Println("运行结果:" + ret)
 				isCall = true
 				break //执行成功并且命中目标
 			}

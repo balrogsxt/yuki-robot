@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 var qqClient *client.QQClient = nil
@@ -24,6 +25,11 @@ func SetLoginQQClient(client *client.QQClient) {
 func NewText(content string) IMsg {
 	return Text{
 		Content: content,
+	}
+}
+func NewFace(id int32) IMsg {
+	return Face{
+		Id: id,
 	}
 }
 
@@ -50,9 +56,6 @@ func NewAt(qq int64, display ...string) IMsg {
 		Display: show,
 	}
 }
-func AtCode(qq int64) string {
-	return fmt.Sprintf("[type=at,value=%d]", qq)
-}
 
 //发送指定ID图片
 func NewImageId(imageId string) IMsg {
@@ -60,18 +63,10 @@ func NewImageId(imageId string) IMsg {
 		Id: imageId,
 	}
 }
-func ImageCode(id_url_file string) string {
-	return fmt.Sprintf("[type=image,value=%s]", id_url_file)
-}
+
 func NewAudio(groupId int64, id_file_url string) IMsg {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("异常: ", err)
-		}
-	}()
 	var _fileByte []byte = nil
 	var er error
-
 	flag, _ := regexp.Match("^\\{[a-zA-Z0-9-]+\\}\\.(amr)$", []byte(id_file_url))
 	flag2, _ := regexp.Match("^http(s?)", []byte(id_file_url))
 	if flag {
@@ -176,21 +171,38 @@ func NewImage(groupId int64, id_file_url string) IMsg {
 //发送群消息[自定义CQ码方式]
 func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 	/**
-	普通文字普通文字普通文字
-	[type=at,value=2289453456] = at指定
-	[type=at,value=0] = at全体
-	[type=face,id=100]
-	[type=image,value={E4AD8A49-C2E8-1287-E5B3-559F7E5376AF}.PNG] = 发送图片ID
-	[type=image,value=./test/1.jpg] = 发送本地图片
+	CQ码消息拆分实现,当前已支持的格式,看着好sb
+
+	--------已实现的功能
+
+	[CQ:at,qq=2289453456] = at指定 0代表全体群员
+	[CQ:image,file=xxx.png] 发送图片,支持本地、网络、Id发送
+	[CQ:face,id=123] QQ表情
+	[CQ:record,file=xxxx.amr] 发送语音文件,如果是别人发的首先本地需要有缓存
+
+	--------还未实现的功能,后面的功能看情况实现吧...
+	[CQ:shake]  抖动
+	[CQ:dice]   骰子
+	[CQ:poke]   戳一戳
+	[CQ:share,url=http://xxxxx] 分享链接
+	[CQ:contact,type=qq,id=100000] 推荐好友
+	[CQ:contact,type=group,id=100000] 推荐群
+	[CQ:location,lat=39,lon=39]  位置
+	[CQ:music,type=163,id=10000] 音乐分享
+	[CQ:reply,id=1000]  回复消息
+	[CQ:forward,id=1000] 合并转发
+	[CQ:node,id=123456]  合并转发节点
+	[CQ:xml,data=<?xml ...]  xml消息
+	[CQ:json,data={"app": ...] json消息
 	*/
-	reg, _ := regexp.Compile("\\[type=.*?,value=.*?\\]|\\D|\\d")
+	reg, _ := regexp.Compile("\\[CQ:([a-z]+).*?\\]|\\D|\\d")
 	list := reg.FindAllString(text, -1)
 
 	els := make([]IMsg, 0)
 
 	tmpText := ""
 	for _, txt := range list {
-		regex, _ := regexp.Compile("\\[type=(.*)?,value=(.*)?\\]")
+		regex, _ := regexp.Compile("\\[CQ:([a-z]+)(.*)?\\]")
 		item := regex.FindStringSubmatch(txt)
 		if len(item) >= 3 {
 			//如果匹配成功到了,结算文字
@@ -203,28 +215,60 @@ func SendGroupMessageText(groupId int64, text string) GroupMsgId {
 
 			//判断类型
 			_type := item[1]
-			_value := item[2]
+			//解析参数值
+			_tmpValue := strings.Split(item[2], ",")
+			_value := make(map[string]string, 0)
+			for _, p := range _tmpValue {
+				ks := strings.Split(p, "=")
+				if len(ks) >= 2 {
+					_value[ks[0]] = ks[1]
+				}
+			}
 
 			switch _type {
 			case "at":
-				elem = func(v string) IMsg {
-					if qq, e := strconv.ParseInt(v, 10, 64); e == nil {
-						return NewAt(qq)
-					} else {
-						return nil
+				//At用户 可能存在的参数:qq
+				elem = func(v map[string]string) IMsg {
+					if qq, has := v["qq"]; has {
+						if qq, e := strconv.ParseInt(qq, 10, 64); e == nil {
+							return NewAt(qq)
+						}
 					}
+					return nil
 				}(_value)
 				break
 			case "image":
-				elem = func(v string) IMsg {
-					return NewImage(groupId, v)
+				//发送图片 可能存在的参数:file 支持id、文件路径、网络url地址
+				elem = func(v map[string]string) IMsg {
+					if file, has := v["file"]; has {
+						return NewImage(groupId, file)
+					}
+					return nil
 				}(_value)
 				break
+
 			case "audio":
-				elem = func(v string) IMsg {
-					return NewAudio(groupId, v)
+				//发送语音 如果参数是字符串id则必须在本地接收过该语音文件缓存,否则无法发送
+				//可能存在的参数:file 支持id、文件路径、网络url地址
+				elem = func(v map[string]string) IMsg {
+					if file, has := v["file"]; has {
+						return NewAudio(groupId, file)
+					}
+					return nil
 				}(_value)
 				break
+
+			case "face": //发送表情 可能存在的参数:id
+				elem = func(v map[string]string) IMsg {
+					if id, has := v["id"]; has {
+						if _id, err := strconv.ParseInt(id, 10, 32); err == nil {
+							return NewFace(int32(_id))
+						}
+					}
+					return nil
+				}(_value)
+				break
+
 			}
 			if elem != nil {
 				els = append(els, elem)

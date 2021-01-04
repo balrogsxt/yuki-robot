@@ -5,6 +5,7 @@ import (
 	"github.com/balrogsxt/xtbot-go/app"
 	"github.com/balrogsxt/xtbot-go/app/db"
 	"github.com/balrogsxt/xtbot-go/robot/api"
+	"github.com/balrogsxt/xtbot-go/robot/cq"
 	"github.com/balrogsxt/xtbot-go/util"
 	"github.com/balrogsxt/xtbot-go/util/logger"
 	"strings"
@@ -23,20 +24,20 @@ func (this *AddKey) Call(value string, event api.GroupMessageEventHandle) bool {
 	//空格分离
 	s := strings.Split(value, " ")
 	if len(s) < 2 {
-		this.SendErrorMessage(event.Group.Id, api.AtCode(event.QQ.Uin)+"\n自定义回复格式不正确~")
+		api.NewGroupException(cq.At(event.QQ.Uin) + "\n自定义回复格式不正确~")
 		return true
 	}
 	key := strings.Trim(value[0:len(s[0])], " ")
 	reply := strings.Trim(value[strings.Index(value, s[1]):], " ")
 	if len(key) == 0 || len(reply) == 0 {
-		this.SendErrorMessage(event.Group.Id, api.AtCode(event.QQ.Uin)+"\n关键词回复不能为空!")
+		api.NewGroupException(cq.At(event.QQ.Uin) + "\n关键词回复不能为空!")
 		return true
 	}
 	md5 := util.Md5String(fmt.Sprintf("%s_%s", key, reply))
 
 	has, _ := app.GetDb().Where("md5 = ?", md5).Exist(&db.GroupReply{})
 	if has {
-		this.SendErrorMessage(event.Group.Id, api.AtCode(event.QQ.Uin)+"\n词条回复已存在")
+		api.NewGroupException(cq.At(event.QQ.Uin) + "\n词条回复已存在")
 		return true
 	}
 
@@ -52,19 +53,10 @@ func (this *AddKey) Call(value string, event api.GroupMessageEventHandle) bool {
 
 	if _, err := app.GetDb().InsertOne(r); err != nil {
 		logger.Warning("[添加回复] 添加自定义回复失败: %s", err.Error())
-		this.SendErrorMessage(event.Group.Id, api.AtCode(event.QQ.Uin)+"\n添加自定义回复失败: 数据库错误~")
+		api.NewGroupException(cq.At(event.QQ.Uin) + "\n添加自定义回复失败: 数据库错误~")
 		return true
 	}
 
-	event.Group.SendGroupMessageText(api.AtCode(event.QQ.Uin) + "\n添加自定义回复成功!")
+	event.Group.SendGroupMessageText(cq.At(event.QQ.Uin) + "\n添加自定义回复成功!")
 	return true
-}
-
-//运行错误的发送消息,延迟撤回
-func (this *AddKey) SendErrorMessage(groupId int64, text string) {
-	m := api.SendGroupMessageText(groupId, text)
-	go func() {
-		time.Sleep(time.Millisecond * 3000)
-		api.RecallGroupMessage(groupId, m.MsgId.Id)
-	}()
 }
