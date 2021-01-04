@@ -1,7 +1,6 @@
-# XtRobot
+# Yuki-Robot
 ## 简介
-基于 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 实现的协议开发的QQ机器人(可能不适用于所有人)
-> 项目将核心协议库合并整合了一下方便开发,目前开发阶段主要以`群组消息事件`为主
+基于 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 实现的协议开发的QQ机器人,主要按群消息为模块处理实现功能
 
 ## 机器人配置
 
